@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>La meva App</title>
+
+  <!-- Bootstrap 5 -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+
+  <style>
+    /* ── Variables de color ── canvia aquí quan tinguis els corporatius ── */
+    :root {
+      --color-primary:   #0d6efd;
+      --color-secondary: #6c757d;
+      --color-dark:      #212529;
+      --color-light:     #f8f9fa;
+    }
+
+    body        { background: var(--color-light); font-family: 'Segoe UI', sans-serif; }
+    .navbar     { background: var(--color-dark) !important; }
+    .navbar-brand span { color: var(--color-primary); }
+    .section-title { border-left: 4px solid var(--color-primary); padding-left: .75rem; }
+
+    /* Taula responsive amb capçalera fosca */
+    thead { background: var(--color-dark); color: #fff; }
+    .table-hover tbody tr:hover { background-color: #e9f0ff; }
+
+    /* Badges d'estat */
+    .badge-actiu   { background: #198754; }
+    .badge-inactiu { background: #dc3545; }
+
+    /* Botó d'acció petit */
+    .btn-acció { padding: .2rem .5rem; font-size: .8rem; }
+
+    /* Toast de notificació */
+    #toast-contenidor { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 9999; }
+
+    /* Pantalla de càrrega */
+    #loading { position: fixed; inset: 0; background: rgba(255,255,255,.85);
+               display: flex; align-items: center; justify-content: center; z-index: 8888; }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════
+     NAVBAR
+══════════════════════════════════════════ -->
+<nav class="navbar navbar-expand-lg navbar-dark sticky-top shadow-sm">
+  <div class="container-fluid">
+    <a class="navbar-brand fw-bold" href="#">
+      <i class="bi bi-grid-3x3-gap-fill me-2"></i>La meva<span>App</span>
+    </a>
+    <button class="navbar-toggler" type="button"
+            data-bs-toggle="collapse" data-bs-target="#navMenu"
+            aria-label="Menú">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navMenu">
+      <ul class="navbar-nav ms-auto gap-1">
+        <li class="nav-item">
+          <a class="nav-link active" href="#" onclick="mostrarVista('publica')">
+            <i class="bi bi-eye me-1"></i>Registres
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="#" onclick="mostrarVista('admin')">
+            <i class="bi bi-shield-lock me-1"></i>Admin
+          </a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<!-- ══════════════════════════════════════════
+     CAPÇALERA / HERO
+══════════════════════════════════════════ -->
+<header class="bg-dark text-white py-5">
+  <div class="container text-center">
+    <h1 class="display-5 fw-bold">La meva App</h1>
+    <p class="lead text-secondary">Gestió de registres connectada a Google Sheets</p>
+  </div>
+</header>
+
+<!-- ══════════════════════════════════════════
+     LOADING OVERLAY
+══════════════════════════════════════════ -->
+<div id="loading">
+  <div class="text-center">
+    <div class="spinner-border text-primary" style="width:3rem;height:3rem" role="status"></div>
+    <p class="mt-3 text-muted">Carregant dades…</p>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     VISTA PÚBLICA  –  taula + filtre
+══════════════════════════════════════════ -->
+<main id="vista-publica" class="container my-5">
+  <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center mb-4 gap-3">
+    <h2 class="section-title mb-0">Registres actius</h2>
+    <input id="cerca-publica" type="search" class="form-control w-auto" placeholder="🔍 Cerca…" />
+  </div>
+
+  <div class="table-responsive shadow-sm rounded">
+    <table class="table table-hover align-middle mb-0" id="taula-publica">
+      <thead>
+        <tr>
+          <th>Nom</th>
+          <th class="d-none d-md-table-cell">Descripció</th>
+          <th class="d-none d-sm-table-cell">Categoria</th>
+          <th class="d-none d-lg-table-cell">Data</th>
+          <th>Estat</th>
+        </tr>
+      </thead>
+      <tbody id="cos-taula-publica">
+        <tr><td colspan="5" class="text-center text-muted py-4">Carregant…</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p id="recompte-publica" class="text-muted small mt-2"></p>
+</main>
+
+<!-- ══════════════════════════════════════════
+     VISTA ADMIN
+══════════════════════════════════════════ -->
+<main id="vista-admin" class="container my-5 d-none">
+  <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center mb-4 gap-3">
+    <h2 class="section-title mb-0">Administració</h2>
+    <div class="d-flex gap-2 flex-wrap">
+      <input id="cerca-admin" type="search" class="form-control" placeholder="🔍 Cerca…" />
+      <button class="btn btn-primary text-nowrap" onclick="obrirFormulari(null)">
+        <i class="bi bi-plus-circle me-1"></i>Nou registre
+      </button>
+    </div>
+  </div>
+
+  <div class="table-responsive shadow-sm rounded">
+    <table class="table table-hover align-middle mb-0" id="taula-admin">
+      <thead>
+        <tr>
+          <th>Nom</th>
+          <th class="d-none d-md-table-cell">Descripció</th>
+          <th class="d-none d-sm-table-cell">Categoria</th>
+          <th class="d-none d-lg-table-cell">Data</th>
+          <th>Estat</th>
+          <th class="text-center">Accions</th>
+        </tr>
+      </thead>
+      <tbody id="cos-taula-admin">
+        <tr><td colspan="6" class="text-center text-muted py-4">Carregant…</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p id="recompte-admin" class="text-muted small mt-2"></p>
+</main>
+
+<!-- ══════════════════════════════════════════
+     MODAL  –  Formulari crear / editar
+══════════════════════════════════════════ -->
+<div class="modal fade" id="modalRegistre" tabindex="-1" aria-labelledby="titolModal">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-dark text-white">
+        <h5 class="modal-title" id="titolModal">Registre</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="formulari-registre" novalidate>
+          <input type="hidden" id="camp-id" />
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Nom <span class="text-danger">*</span></label>
+            <input type="text" id="camp-nom" class="form-control" required maxlength="120" />
+            <div class="invalid-feedback">El nom és obligatori.</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Descripció</label>
+            <textarea id="camp-descripcio" class="form-control" rows="3" maxlength="500"></textarea>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Categoria</label>
+            <input type="text" id="camp-categoria" class="form-control" maxlength="80" />
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel·lar</button>
+        <button type="button" class="btn btn-primary" id="btn-desar" onclick="desarRegistre()">
+          <i class="bi bi-save me-1"></i>Desar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     MODAL  –  Confirmació d'eliminar
+══════════════════════════════════════════ -->
+<div class="modal fade" id="modalEliminar" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title"><i class="bi bi-exclamation-triangle me-2"></i>Eliminar</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        Vols desactivar el registre <strong id="nom-eliminar"></strong>?
+        <p class="text-muted small mt-1 mb-0">El registre quedarà marcat com a inactiu.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel·lar</button>
+        <button type="button" class="btn btn-danger btn-sm" id="btn-confirmar-eliminar">Desactivar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     TOAST  –  notificacions
+══════════════════════════════════════════ -->
+<div id="toast-contenidor">
+  <div id="toast-notif" class="toast align-items-center text-white border-0 shadow" role="alert">
+    <div class="d-flex">
+      <div class="toast-body" id="toast-missatge"></div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer class="bg-dark text-secondary text-center py-3 mt-5 small">
+  &copy; 2026 La meva App &middot; Conectada a Google Sheets
+</footer>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  CONFIGURACIÓ  –  substitueix per la teva URL de Web App
+// ═══════════════════════════════════════════════════════════
+const API_URL = "AQUÍ_LA_TEVA_URL_DE_WEB_APP";
+
+// ═══════════════════════════════════════════════════════════
+//  ESTAT DE L'APLICACIÓ
+// ═══════════════════════════════════════════════════════════
+let totsElsRegistres = [];
+const modalRegistre  = new bootstrap.Modal(document.getElementById("modalRegistre"));
+const modalEliminar  = new bootstrap.Modal(document.getElementById("modalEliminar"));
+const toastEl        = document.getElementById("toast-notif");
+const toast          = new bootstrap.Toast(toastEl, { delay: 3000 });
+
+// ═══════════════════════════════════════════════════════════
+//  INICI
+// ═══════════════════════════════════════════════════════════
+document.addEventListener("DOMContentLoaded", () => {
+  carregarDades();
+
+  document.getElementById("cerca-publica").addEventListener("input", e =>
+    filtrarTaula(e.target.value, "cos-taula-publica", false));
+
+  document.getElementById("cerca-admin").addEventListener("input", e =>
+    filtrarTaula(e.target.value, "cos-taula-admin", true));
+});
+
+// ═══════════════════════════════════════════════════════════
+//  NAVEGACIÓ ENTRE VISTES
+// ═══════════════════════════════════════════════════════════
+function mostrarVista(vista) {
+  document.getElementById("vista-publica").classList.toggle("d-none", vista !== "publica");
+  document.getElementById("vista-admin").classList.toggle("d-none", vista !== "admin");
+  document.querySelectorAll(".nav-link").forEach(l => l.classList.remove("active"));
+  event.currentTarget.classList.add("active");
+  // Tanca el menú mòbil si estava obert
+  const toggler = document.querySelector(".navbar-toggler");
+  if (!toggler.classList.contains("collapsed")) toggler.click();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  CÀRREGA DE DADES (GET)
+// ═══════════════════════════════════════════════════════════
+async function carregarDades() {
+  mostrarLoading(true);
+  try {
+    const res  = await fetch(`${API_URL}?filtre=tots`);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+    totsElsRegistres = data.registres;
+    renderTaulaPublica();
+    renderTaulaAdmin();
+  } catch (err) {
+    mostrarToast("Error carregant dades: " + err.message, "danger");
+    document.getElementById("cos-taula-publica").innerHTML =
+      `<tr><td colspan="5" class="text-center text-danger py-4">
+        <i class="bi bi-wifi-off me-2"></i>No s'han pogut carregar les dades.<br>
+        <small class="text-muted">Comprova que has configurat la URL de la Web App.</small>
+      </td></tr>`;
+  } finally {
+    mostrarLoading(false);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  RENDERITZAR TAULES
+// ═══════════════════════════════════════════════════════════
+function renderTaulaPublica() {
+  const actius = totsElsRegistres.filter(r => r.estat === "actiu");
+  const cos    = document.getElementById("cos-taula-publica");
+  cos.innerHTML = actius.length === 0
+    ? `<tr><td colspan="5" class="text-center text-muted py-4">Cap registre actiu.</td></tr>`
+    : actius.map(r => filaPública(r)).join("");
+  document.getElementById("recompte-publica").textContent =
+    `${actius.length} registre${actius.length !== 1 ? "s" : ""}`;
+}
+
+function renderTaulaAdmin() {
+  const cos = document.getElementById("cos-taula-admin");
+  cos.innerHTML = totsElsRegistres.length === 0
+    ? `<tr><td colspan="6" class="text-center text-muted py-4">Cap registre.</td></tr>`
+    : totsElsRegistres.map(r => filaAdmin(r)).join("");
+  document.getElementById("recompte-admin").textContent =
+    `${totsElsRegistres.length} registre${totsElsRegistres.length !== 1 ? "s" : ""} (inclou inactius)`;
+}
+
+function filaPública(r) {
+  return `<tr>
+    <td class="fw-semibold">${escHtml(r.nom)}</td>
+    <td class="d-none d-md-table-cell text-muted">${escHtml(r.descripcio)}</td>
+    <td class="d-none d-sm-table-cell"><span class="badge bg-secondary">${escHtml(r.categoria)}</span></td>
+    <td class="d-none d-lg-table-cell">${escHtml(r.data)}</td>
+    <td><span class="badge badge-actiu">actiu</span></td>
+  </tr>`;
+}
+
+function filaAdmin(r) {
+  const badgeClass = r.estat === "actiu" ? "badge-actiu" : "badge-inactiu";
+  const inaActiu   = r.estat !== "actiu";
+  return `<tr class="${inaActiu ? "opacity-50" : ""}">
+    <td class="fw-semibold">${escHtml(r.nom)}</td>
+    <td class="d-none d-md-table-cell text-muted">${escHtml(r.descripcio)}</td>
+    <td class="d-none d-sm-table-cell"><span class="badge bg-secondary">${escHtml(r.categoria)}</span></td>
+    <td class="d-none d-lg-table-cell">${escHtml(r.data)}</td>
+    <td><span class="badge ${badgeClass}">${escHtml(r.estat)}</span></td>
+    <td class="text-center text-nowrap">
+      <button class="btn btn-outline-primary btn-acció me-1"
+              onclick='obrirFormulari(${JSON.stringify(r)})'
+              title="Editar">
+        <i class="bi bi-pencil-fill"></i>
+      </button>
+      <button class="btn btn-outline-danger btn-acció"
+              onclick='confirmarEliminar(${JSON.stringify(r)})'
+              ${inaActiu ? "disabled" : ""} title="Desactivar">
+        <i class="bi bi-trash-fill"></i>
+      </button>
+    </td>
+  </tr>`;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  CERCA / FILTRE LOCAL
+// ═══════════════════════════════════════════════════════════
+function filtrarTaula(query, cosId, isAdmin) {
+  const q   = query.toLowerCase().trim();
+  const cos = document.getElementById(cosId);
+  const font = isAdmin ? totsElsRegistres : totsElsRegistres.filter(r => r.estat === "actiu");
+  const filtrats = q === ""
+    ? font
+    : font.filter(r =>
+        r.nom.toLowerCase().includes(q) ||
+        r.descripcio.toLowerCase().includes(q) ||
+        r.categoria.toLowerCase().includes(q)
+      );
+
+  if (filtrats.length === 0) {
+    cos.innerHTML = `<tr><td colspan="${isAdmin ? 6 : 5}" class="text-center text-muted py-4">
+      Cap resultat per "<em>${escHtml(query)}</em>".
+    </td></tr>`;
+    return;
+  }
+  cos.innerHTML = filtrats.map(r => isAdmin ? filaAdmin(r) : filaPública(r)).join("");
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FORMULARI  –  obrir per crear o editar
+// ═══════════════════════════════════════════════════════════
+function obrirFormulari(registre) {
+  const formulari = document.getElementById("formulari-registre");
+  formulari.classList.remove("was-validated");
+  document.getElementById("camp-id").value         = registre ? registre.id         : "";
+  document.getElementById("camp-nom").value         = registre ? registre.nom        : "";
+  document.getElementById("camp-descripcio").value  = registre ? registre.descripcio : "";
+  document.getElementById("camp-categoria").value   = registre ? registre.categoria  : "";
+  document.getElementById("titolModal").textContent = registre ? "Editar registre" : "Nou registre";
+  modalRegistre.show();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  DESAR  –  crear o editar via POST
+// ═══════════════════════════════════════════════════════════
+async function desarRegistre() {
+  const formulari = document.getElementById("formulari-registre");
+  formulari.classList.add("was-validated");
+  if (!formulari.checkValidity()) return;
+
+  const id      = document.getElementById("camp-id").value;
+  const payload = {
+    accio:      id ? "editar" : "crear",
+    id,
+    nom:        document.getElementById("camp-nom").value.trim(),
+    descripcio: document.getElementById("camp-descripcio").value.trim(),
+    categoria:  document.getElementById("camp-categoria").value.trim()
+  };
+
+  const btn = document.getElementById("btn-desar");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Desant…';
+
+  try {
+    const res  = await postApi(payload);
+    if (!res.ok) throw new Error(res.error);
+    modalRegistre.hide();
+    mostrarToast(id ? "Registre actualitzat." : "Registre creat.", "success");
+    await carregarDades();
+  } catch (err) {
+    mostrarToast("Error: " + err.message, "danger");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-save me-1"></i>Desar';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  ELIMINAR  –  confirmació i POST
+// ═══════════════════════════════════════════════════════════
+let idPendentEliminar = null;
+
+function confirmarEliminar(registre) {
+  idPendentEliminar = registre.id;
+  document.getElementById("nom-eliminar").textContent = registre.nom;
+  modalEliminar.show();
+
+  document.getElementById("btn-confirmar-eliminar").onclick = async () => {
+    modalEliminar.hide();
+    try {
+      const res = await postApi({ accio: "eliminar", id: idPendentEliminar });
+      if (!res.ok) throw new Error(res.error);
+      mostrarToast("Registre desactivat.", "warning");
+      await carregarDades();
+    } catch (err) {
+      mostrarToast("Error eliminant: " + err.message, "danger");
+    }
+  };
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FETCH API  –  crida POST genèrica
+// ═══════════════════════════════════════════════════════════
+async function postApi(payload) {
+  const res = await fetch(API_URL, {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify(payload)
+  });
+  return res.json();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  UTILITATS UI
+// ═══════════════════════════════════════════════════════════
+function mostrarToast(missatge, tipus = "success") {
+  const colors = { success: "#198754", danger: "#dc3545", warning: "#fd7e14", info: "#0dcaf0" };
+  toastEl.style.backgroundColor = colors[tipus] || colors.info;
+  document.getElementById("toast-missatge").textContent = missatge;
+  toast.show();
+}
+
+function mostrarLoading(visible) {
+  document.getElementById("loading").style.display = visible ? "flex" : "none";
+}
+
+function escHtml(str) {
+  if (!str) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+</script>
+</body>
+</html>
